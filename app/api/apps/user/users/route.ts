@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
   const roleId = searchParams.get('roleId') || null;
 
   try {
+    // Test database connection first
+    await prisma.$connect();
+
     // Map status query to enum type, fallback to null if invalid
     const statusFilter =
       status && status !== 'all' ? (status as UserStatus) : undefined;
@@ -29,8 +32,8 @@ export async function GET(req: NextRequest) {
     const totalCount = await prisma.user.count({
       where: {
         AND: [
-          ...(statusFilter ? [{ status: statusFilter }] : []), // Add status filter if valid
-          ...(roleId && roleId !== 'all' ? [{ roleId }] : []), // Add role filter if valid
+          ...(statusFilter ? [{ status: statusFilter }] : []),
+          ...(roleId && roleId !== 'all' ? [{ roleId }] : []),
           {
             OR: [
               { name: { contains: query, mode: 'insensitive' } },
@@ -59,8 +62,8 @@ export async function GET(req: NextRequest) {
     const users = await prisma.user.findMany({
       where: {
         AND: [
-          ...(statusFilter ? [{ status: statusFilter }] : []), // Add status filter if valid
-          ...(roleId && roleId !== 'all' ? [{ roleId }] : []), // Add role filter if valid
+          ...(statusFilter ? [{ status: statusFilter }] : []),
+          ...(roleId && roleId !== 'all' ? [{ roleId }] : []),
           {
             OR: [
               { name: { contains: query, mode: 'insensitive' } },
@@ -98,11 +101,32 @@ export async function GET(req: NextRequest) {
         limit,
       },
     });
-  } catch {
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    
+    // Determine if it's a connection error
+    const isConnectionError = error instanceof Error && 
+      (error.message.includes('connect ECONNREFUSED') || 
+       error.message.includes('Connection refused') ||
+       error.message.toLowerCase().includes('timeout'));
+
+    const errorMessage = isConnectionError
+      ? 'Database connection error. Please check the database configuration.'
+      : 'Oops! Something went wrong. Please try again in a moment.';
+
     return NextResponse.json(
-      { message: 'Oops! Something went wrong. Please try again in a moment.' },
+      { 
+        message: errorMessage,
+        error: process.env.NODE_ENV === 'development' ? error : undefined 
+      },
       { status: 500 },
     );
+  } finally {
+    try {
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error('Error disconnecting from database:', error);
+    }
   }
 }
 
