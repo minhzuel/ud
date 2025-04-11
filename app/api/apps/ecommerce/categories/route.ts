@@ -93,8 +93,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       {
-        message:
-          'Oops! Something didn't go as planned. Please try again in a moment.',
+        message: "Oops! Something didn't go as planned. Please try again in a moment.",
       },
       { status: 500 },
     );
@@ -159,8 +158,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json(
       {
-        message:
-          'Oops! Something didn't go as planned. Please try again in a moment.',
+        message: "Oops! Something didn't go as planned. Please try again in a moment.",
       },
       { status: 500 },
     );
