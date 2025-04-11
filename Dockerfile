@@ -20,6 +20,12 @@ COPY . .
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# Generate Prisma Client and run migrations
+RUN npx prisma generate
+RUN if [ "$NODE_ENV" = "production" ]; then \
+        npx prisma migrate deploy; \
+    fi
+
 RUN npm run build
 
 # Production image, copy all the files and run next
@@ -33,6 +39,9 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Set the correct permission for prerender cache
 RUN mkdir .next
