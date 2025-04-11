@@ -7,26 +7,42 @@ import {
   CategorySchema,
   CategorySchemaType,
 } from '@/app/apps/ecommerce/categories/forms/category';
+import { EcommerceCategoryStatus } from '@prisma/client';
+
+interface CategoryWithCount {
+  id: string;
+  name: string;
+  description?: string | null;
+  status: EcommerceCategoryStatus;
+  _count: {
+    ecommerceProduct: number;
+  };
+}
 
 // GET: Fetch all categories with permissions and creator details
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const page = Number(searchParams.get('page') || 1);
-  const limit = Number(searchParams.get('limit') || 10);
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const limit = parseInt(searchParams.get('limit') || '10', 10);
   const query = searchParams.get('query') || '';
-  const sortField = searchParams.get('sort') || 'createdAt';
-  const sortDirection = searchParams.get('dir') === 'desc' ? 'desc' : 'asc';
+  const sortField = searchParams.get('sort') || 'name';
+  const sortDirection = searchParams.get('dir') || 'asc';
   const skip = (page - 1) * limit;
 
   try {
-    // Count total records matching the filter
+    // Build where clause for search
+    const where = query
+      ? {
+          OR: [
+            { name: { contains: query, mode: 'insensitive' } },
+            { description: { contains: query, mode: 'insensitive' } },
+          ],
+        }
+      : {};
+
+    // Get total count for pagination
     const total = await prisma.ecommerceCategory.count({
-      where: {
-        name: {
-          contains: query,
-          mode: 'insensitive',
-        },
-      },
+      where,
     });
 
     let isTableEmpty = false;
@@ -37,47 +53,40 @@ export async function GET(request: NextRequest) {
       isTableEmpty = overallTotal === 0;
     }
 
-    // Get paginated categories with creator details
-    const categories =
-      total > 0
-        ? await prisma.ecommerceCategory.findMany({
-            skip,
-            take: limit,
-            where: {
-              name: {
-                contains: query,
-                mode: 'insensitive',
+    // Get categories with product count
+    const categories = total
+      ? await prisma.ecommerceCategory.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            status: true,
+            _count: {
+              select: {
+                ecommerceProduct: true,
               },
             },
-            orderBy: {
-              [sortField]: sortDirection,
-            },
-            include: {
-              createdByUser: {
-                select: {
-                  name: true,
-                  id: true,
-                  avatar: true,
-                  email: true,
-                },
-              },
-              _count: {
-                select: { ecommerceProduct: true },
-              },
-            },
-          })
-        : [];
+          },
+          orderBy: {
+            [sortField]: sortDirection,
+          },
+          skip,
+          take: limit,
+        })
+      : [];
 
-    const responseData = categories.map((category) => ({
+    const responseData = categories.map((category: CategoryWithCount) => ({
       ...category,
-      productCount: category._count.ecommerceProduct, // Add product count
+      productCount: category._count.ecommerceProduct,
     }));
 
     return NextResponse.json({
       data: responseData,
-      pagination: {
+      meta: {
         total,
         page,
+        limit,
       },
       empty: isTableEmpty,
     });
@@ -85,7 +94,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         message:
-          'Oops! Something didn’t go as planned. Please try again in a moment.',
+          'Oops! Something didn't go as planned. Please try again in a moment.',
       },
       { status: 500 },
     );
@@ -151,7 +160,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         message:
-          'Oops! Something didn’t go as planned. Please try again in a moment.',
+          'Oops! Something didn't go as planned. Please try again in a moment.',
       },
       { status: 500 },
     );
