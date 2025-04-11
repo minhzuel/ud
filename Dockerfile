@@ -9,6 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma
 RUN npm ci
+RUN npm install @prisma/client
 RUN npx prisma generate
 
 # Rebuild the source code only when needed
